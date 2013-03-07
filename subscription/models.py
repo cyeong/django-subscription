@@ -51,8 +51,8 @@ class Subscription(models.Model):
     trial_period = models.PositiveIntegerField(null=True, blank=True)
     trial_unit = models.CharField(max_length=1, null=True, choices=_TIME_UNIT_CHOICES)
     recurrence_period = models.PositiveIntegerField(null=True, blank=True)
-    recurrence_unit = models.CharField(max_length=1, null=True,
-                                       choices=((None, ugettext_lazy("No recurrence")),)
+    recurrence_unit = models.CharField(max_length=1, null=True, blank=True,
+                                       choices = ((None, ugettext_lazy("No recurrence")),)
                                        + _TIME_UNIT_CHOICES)
     group = models.ForeignKey(auth.models.Group, null=False, blank=False, unique=False)
 
