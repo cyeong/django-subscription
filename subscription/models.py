@@ -284,7 +284,8 @@ def _ipn_usersubscription(payment):
 
     try:
         u = auth.models.User.objects.get(id=payment.custom)
-    except auth.models.User.DoesNotExist:
+    #except auth.models.User.DoesNotExist:
+    except Exception:
         u = None
 
     if u and s:
@@ -304,44 +305,47 @@ def _ipn_usersubscription(payment):
 def handle_payment_was_successful(sender, **kwargs):
     us = _ipn_usersubscription(sender)
     u, s = us.user, us.subscription
-    if us:
-        if not s.recurrence_unit:
-            if sender.mc_gross == s.price:
-                us.subscribe()
-                us.expires = None
-                us.active = True
-                us.save()
-                Transaction(user=u, subscription=s, ipn=sender,
-                            event='one-time payment', amount=sender.mc_gross
-                            ).save()
-                signals.signed_up.send(s, ipn=sender, subscription=s, user=u,
-                                       usersubscription=us)
+    if not sender.custom == "":
+        if us:
+            if not s.recurrence_unit:
+                if sender.mc_gross == s.price:
+                    us.subscribe()
+                    us.expires = None
+                    us.active = True
+                    us.save()
+                    Transaction(user=u, subscription=s, ipn=sender,
+                                event='one-time payment', amount=sender.mc_gross
+                                ).save()
+                    signals.signed_up.send(s, ipn=sender, subscription=s, user=u,
+                                        usersubscription=us)
+                else:
+                    Transaction(user=u, subscription=s, ipn=sender,
+                                event='incorrect payment', amount=sender.mc_gross
+                                ).save()
+                    signals.event.send(s, ipn=sender, subscription=s, user=u,
+                                    usersubscription=us, event='incorrect payment')
             else:
-                Transaction(user=u, subscription=s, ipn=sender,
-                            event='incorrect payment', amount=sender.mc_gross
-                            ).save()
-                signals.event.send(s, ipn=sender, subscription=s, user=u,
-                                   usersubscription=us, event='incorrect payment')
+                if sender.mc_gross == s.price:
+                    us.extend()
+                    us.save()
+                    Transaction(user=u, subscription=s, ipn=sender,
+                                event='subscription payment', amount=sender.mc_gross
+                                ).save()
+                    signals.paid.send(s, ipn=sender, subscription=s, user=u,
+                                    usersubscription=us)
+                else:
+                    Transaction(user=u, subscription=s, ipn=sender,
+                                event='incorrect payment', amount=sender.mc_gross
+                                ).save()
+                    signals.event.send(s, ipn=sender, subscription=s, user=u,
+                                    usersubscription=us, event='incorrect payment')
         else:
-            if sender.mc_gross == s.price:
-                us.extend()
-                us.save()
-                Transaction(user=u, subscription=s, ipn=sender,
-                            event='subscription payment', amount=sender.mc_gross
-                            ).save()
-                signals.paid.send(s, ipn=sender, subscription=s, user=u,
-                                  usersubscription=us)
-            else:
-                Transaction(user=u, subscription=s, ipn=sender,
-                            event='incorrect payment', amount=sender.mc_gross
-                            ).save()
-                signals.event.send(s, ipn=sender, subscription=s, user=u,
-                                   usersubscription=us, event='incorrect payment')
+            Transaction(user=u, subscription=s, ipn=sender,
+                        event='unexpected payment', amount=sender.mc_gross
+                        ).save()
+            signals.event.send(s, ipn=sender, subscription=s, user=u, event='unexpected_payment')
     else:
-        Transaction(user=u, subscription=s, ipn=sender,
-                    event='unexpected payment', amount=sender.mc_gross
-                    ).save()
-        signals.event.send(s, ipn=sender, subscription=s, user=u, event='unexpected_payment')
+        pass
 ipn.signals.payment_was_successful.connect(handle_payment_was_successful)
 
 
